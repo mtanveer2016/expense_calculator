@@ -1,6 +1,9 @@
 from rest_framework.test import APITestCase
 from .models import Expense
+"""
+added tests
 
+"""
 
 class ExpenseAPITestCase(APITestCase):
 

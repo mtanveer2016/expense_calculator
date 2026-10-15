@@ -1,9 +1,14 @@
 
 
-from rest_framework.viewsets import ModelViewSet  # pyright: ignore[reportMissingImports]
+from django.shortcuts import render
+from rest_framework.viewsets import ModelViewSet
 
 from .models import Expense
-from .serializers import ExpenseSerializer  # pyright: ignore[reportMissingImports]
+from .serializers import ExpenseSerializer
+
+
+def index(request):
+    return render(request, 'expenses/index.html')
 
 
 class ExpenseViewSet(ModelViewSet):

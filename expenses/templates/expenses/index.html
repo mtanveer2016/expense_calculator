@@ -1,55 +1,160 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
+  <title>Expense Tracker</title>
   <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@latest/css/pico.min.css">
   <style>
-
+    table { width: 100%; }
+    tbody tr:hover { background: #f5f5f5; }
+    .container { max-width: 900px; margin: 2rem auto; }
+    form .grid { display: grid; grid-template-columns: 2fr 1fr 2fr auto; gap: 0.5rem; align-items: center; }
   </style>
 </head>
-
 <body>
   <div class="container">
+    <h1> Expense Tracker</h1>
 
+    {% csrf_token %}
+
+    <form onsubmit="event.preventDefault(); postExpense();">
+      <div class="grid">
+        <input type="text" id="name" placeholder="Name" required>
+        <input type="number" id="amount" step="0.01" placeholder="Amount" required>
+        <select id="category">
+          <option value="Food">Food</option>
+          <option value="Transport">Transport</option>
+          <option value="Entertainment">Entertainment</option>
+          <option value="Utilities">Utilities</option>
+          <option value="Other">Other</option>
+        </select>
+        <button type="submit">Add</button>
+      </div>
+    </form>
+
+    <table id="expense-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Amount</th>
+          <th>Timestamp</th>
+          <th>Category</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
+
   <script>
     const apiUri = '/api/expenses/';
+
+    // --- CSRF token helper ---
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return '';
+    }
+    const csrftoken = getCookie('csrftoken');
+
     const headers = {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrftoken,
     };
+
+    // --- Render one expense row ---
     function renderExpense(expense) {
-      console.table(expense);
+      const timestamp = new Date(expense.timestamp).toLocaleString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: 'numeric'
+      });
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${expense.name}</td>
+        <td>${expense.amount}</td>
+        <td>${timestamp}</td>
+        <td>${expense.category}</td>
+        <td><button class="secondary" onclick="deleteExpense(${expense.id})">✕</button></td>
+      `;
+      document.querySelector('#expense-table tbody').appendChild(tr);
     }
+
+    // --- Load all expenses ---
     function refreshTable() {
-
+      const tbody = document.querySelector('#expense-table tbody');
+      tbody.innerHTML = '';
+      getExpenses();
     }
+
     function getExpenses() {
-        fetch(apiUri, {
-            method: 'GET',
-            headers: headers
-        })        .then(response => response.json())
-            .then(data => {
-                data.forEach(expense => renderExpense(expense));
-            })
-            .catch(error => console.error('Error fetching expenses:', error));
-
+      fetch(apiUri, { method: 'GET', headers })
+        .then(response => response.json())
+        .then(data => {
+          console.table(data);
+          data.forEach(renderExpense);
+        })
+        .catch(error => console.error('Error fetching expenses:', error));
     }
+
+    // --- Create a new expense ---
     function postExpense() {
+      const name = document.getElementById('name').value.trim();
+      const amount = document.getElementById('amount').value.trim();
+      const category = document.getElementById('category').value;
 
+      if (!name || !amount) {
+        alert('Please enter both a name and an amount.');
+        return;
+      }
+
+      const expense = { name, amount, category };
+
+      fetch(apiUri, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(expense),
+      })
+        .then(response => {
+          if (!response.ok) {
+            return response.json().then(err => { throw err; });
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.table(data);
+          // clear the form
+          document.getElementById('name').value = '';
+          document.getElementById('amount').value = '';
+          refreshTable();
+        })
+        .catch(error => console.error('Error creating expense:', error));
     }
+
+    // --- Delete an expense ---
     function deleteExpense(id) {
-
+      if (!id) {
+        console.error('deleteExpense called without an id');
+        return;
+      }
+      fetch(`${apiUri}${id}/`, {
+        method: 'DELETE',
+        headers,
+      })
+        .then(response => {
+          if (response.ok) {
+            refreshTable();
+          } else {
+            console.error('Error deleting expense:', response.status);
+          }
+        })
+        .catch(error => console.error('Error deleting expense:', error));
     }
-    // const table = document.createElement('table');
-    // document.body.appendChild(table);
-    // refreshTable();
-    // document.querySelector("input[type='submit']").addEventListener('click', postExpense);
-    getExpenses();
+
+    // --- Initial page load ---
+    refreshTable();
   </script>
 </body>
-
 </html>
